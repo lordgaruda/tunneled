@@ -1,0 +1,35 @@
+# ==============================================================================
+# Cloudflare Tunnel Configuration
+# ==============================================================================
+# Tunnel UUID: Replace with your actual tunnel UUID (matching credentials file)
+tunnel: your-tunnel-uuid-here
+
+# Absolute path inside the cloudflared container where the credentials JSON is mounted
+credentials-file: /etc/cloudflared/credentials/your-tunnel-uuid-here.json
+
+# Protocol used to establish connection with Cloudflare Edge (auto, quic, or http2)
+protocol: auto
+
+# Ingress Rules: Cloudflare routes requests based on hostname / path
+# Rules are evaluated top to bottom; the first matching rule applies.
+ingress:
+  # Route main web application traffic to Nginx reverse proxy
+  - hostname: app.yourdomain.com
+    service: http://nginx:80
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      keepAliveTimeout: 1m30s
+      http2Origin: true
+
+  # (Optional) Route a direct diagnostic / whoami service
+  - hostname: whoami.yourdomain.com
+    service: http://whoami:80
+
+  # (Optional) Wildcard or catch-all custom domain to Nginx
+  # - hostname: "*.yourdomain.com"
+  #   service: http://nginx:80
+
+  # Catch-all rule: returns HTTP 404 for any unmatched hostnames (REQUIRED by Cloudflare)
+  - service: http_status:404
+

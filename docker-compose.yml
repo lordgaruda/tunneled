@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Primary Cloudflare Tunnel (100% ENV Driven via Token or Auto-Config)
+  # ============================================================================
+  cloudflared-primary:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_primary
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    volumes:
+      - ./cloudflared/entrypoint.sh:/entrypoint.sh:ro
+      - ./cloudflared/credentials:/etc/cloudflared/credentials
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN_PRIMARY:-}
+      - TUNNEL_ID=${TUNNEL_ID:-}
+      - TUNNEL_CREDENTIALS_BASE64=${TUNNEL_CREDENTIALS_BASE64:-}
+      - PRIMARY_DOMAIN=${PRIMARY_DOMAIN:-}
+      - UPSTREAM_HOST=nginx
+      - UPSTREAM_PORT=80
+      - TZ=${TZ:-UTC}
+    networks:
+      - tunnel-net
+    depends_on:
+      nginx:
+        condition: service_healthy
+
+  # ============================================================================
+  # Secondary Cloudflare Tunnel (Multi-Tunnel Support for 2nd domain/account)
+  # Activated automatically when COMPOSE_PROFILES=multi-tunnel in .env
+  # ============================================================================
+  cloudflared-secondary:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_secondary
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    volumes:
+      - ./cloudflared/entrypoint.sh:/entrypoint.sh:ro
+      - ./cloudflared/credentials:/etc/cloudflared/credentials
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN_SECONDARY:-}
+      - UPSTREAM_HOST=nginx
+      - UPSTREAM_PORT=80
+      - TZ=${TZ:-UTC}
+    networks:
+      - tunnel-net
+    profiles:
+      - multi-tunnel
+    depends_on:
+      nginx:
+        condition: service_healthy
+
+  # ============================================================================
+  # Nginx Reverse Proxy (Dynamic envsubst Templating)
+  # ============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/conf.d/security_headers.conf:/etc/nginx/conf.d/security_headers.conf:ro
+      - ./sample-app/html:/usr/share/nginx/html:ro
+    environment:
+      - PRIMARY_DOMAIN=${PRIMARY_DOMAIN:-_}
+      - UPSTREAM_APP_HOST=${UPSTREAM_APP_HOST:-whoami}
+      - UPSTREAM_APP_PORT=${UPSTREAM_APP_PORT:-80}
+      - CLIENT_MAX_BODY_SIZE=${CLIENT_MAX_BODY_SIZE:-50M}
+    expose:
+      - "80"
+    networks:
+      - tunnel-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================================
+  # Diagnostic / Test Service (whoami)
+  # ============================================================================
+  whoami:
+    image: traefik/whoami:latest
+    container_name: diagnostic_whoami
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - tunnel-net
+
+networks:
+  tunnel-net:
+    name: tunnel-net
+    driver: bridge
