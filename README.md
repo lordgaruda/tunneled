@@ -1,5 +1,9 @@
 # 100% ENV-Driven Docker Setup: Multi-Cloudflare Tunnel + Nginx (Zero Open Inbound Ports)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker Compose](https://img.shields.io/badge/Docker_Compose-Ready-blue.svg)](docker-compose.yml)
+[![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare_Tunnel-Zero_Trust-orange.svg)](https://www.cloudflare.com/products/tunnel/)
+
 A complete, production-ready Docker Compose environment for hosting web applications without opening **any inbound ports** (no port 80 or 443 required on your host/router/firewall).
 
 **⚡ Fully Environment-Variable Driven**: No need to edit `config.yml` or manual Nginx configuration files! Just set variables in your `.env` file and deploy.
